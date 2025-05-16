@@ -9,7 +9,7 @@ Libraries imported:
 from streamlit.testing.v1 import AppTest
 
 def test_login():
-    at = AppTest.from_file('app.py').run()
+    at = AppTest.from_file('demo.py').run()
     at.text_input[0].input('test').run()
     at.text_input[1].input('ABCdef123$$').run()
     at.button[0].click().run()
