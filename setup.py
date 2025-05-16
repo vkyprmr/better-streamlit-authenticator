@@ -28,6 +28,7 @@ setuptools.setup(
         "extra-streamlit-components >= 0.1.70",
         "PyJWT >=2.3.0",
         "PyYAML >= 5.3.1",
-        "streamlit >= 1.37.0"
+        "streamlit >= 1.37.0",
+        "argon2-cffi==23.1.0"
     ],
 )
