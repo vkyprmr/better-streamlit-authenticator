@@ -4,25 +4,42 @@ cookie:
   key: some_key
   name: some_cookie_name
 credentials:
+  roles:
+    admin:
+      usernames:
+      - jdoe
+      - jsmith
   usernames:
+    jdoe:
+      email: jdoe@gmail.com
+      failed_login_attempts: 0
+      first_name: John
+      last_name: Doe
+      logged_in: false
+      password: $argon2id$v=19$m=65536,t=3,p=4$T/Xrwym16fOVYNIjU9Wd6A$nKxrm+S4BzjIf8PoeMD3ZoygxrKCg3BWngQGIYvfFxc
+      roles:
+      - admin
+      - editor
+      - viewer
     jsmith:
       email: jsmith@gmail.com
       failed_login_attempts: 0
       first_name: John
       last_name: Smith
       logged_in: false
-      password: $2b$12$lhOfbg3eMo9/TIcgFOvlbuYTGJQBdTLU/ek3SiDOooJNrIktqfKr6
+      password: $argon2id$v=19$m=65536,t=3,p=4$NNktseiPYxznMWEbV0HcXw$mNQEpMXbLx1LtPc0PF1rajqEuJ2LA6W31DExP9YxtY8
       roles:
       - admin
       - editor
       - viewer
-    rbriggs:
-      email: rbriggs@gmail.com
+    test:
+      email: test@email.com
       failed_login_attempts: 0
-      first_name: Rebecca
-      last_name: Briggs
+      first_name: test
+      last_name: test
       logged_in: false
-      password: $2b$12$SxD/z1xJN6C7G7ygeiCuDOR88ZFAMoky9nCm9JgACEuJiVbVV6/4a
+      password: $argon2id$v=19$m=65536,t=3,p=4$Yzj15yEDsLErbRbXocLJqw$2bhGkUkcTV8Ann2YoDEEPzHQgFxOio7t1TZXHQNazic
+      password_hint: std
       roles:
       - viewer
 oauth2:
@@ -35,6 +52,3 @@ oauth2:
     client_secret: null
     redirect_uri: null
     tenant_id: null
-pre-authorized:
-  emails:
-  - melsby@gmail.com

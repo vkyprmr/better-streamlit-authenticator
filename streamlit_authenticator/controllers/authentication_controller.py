@@ -30,14 +30,15 @@ class AuthenticationController:
     password reset, and user modifications.
     """
     def __init__(
-            self,
-            credentials: Optional[Dict[str, Any]] = None,
-            validator: Optional[Validator] = None,
-            auto_hash: bool = True,
-            path: Optional[str] = None,
-            api_key: Optional[str] = None,
-            secret_key: str = 'some_key',
-            server_url: Optional[str] = None) -> None:
+        self,
+        credentials: Optional[Dict[str, Any]] = None,
+        validator: Optional[Validator] = None,
+        auto_hash: bool = True,
+        path: Optional[str] = None,
+        api_key: Optional[str] = None,
+        secret_key: str = 'some_key',
+        server_url: Optional[str] = None
+    ) -> None:
         """
         Initializes the AuthenticationController instance.
 
@@ -64,6 +65,8 @@ class AuthenticationController:
         self.authentication_model = AuthenticationModel(credentials, auto_hash, path, api_key,
                                                         self.secret_key, server_url, self.validator)
         self.encryptor = Encryptor(self.secret_key)
+
+    # Check captcha
     def _check_captcha(self, captcha_name: str, exception: Type[Exception], entered_captcha: str
                        ) -> None:
         """
@@ -82,6 +85,8 @@ class AuthenticationController:
             del st.session_state[captcha_name]
         else:
             raise exception('Captcha entered incorrectly')
+
+    # Check two factor authentication code
     def check_two_factor_auth_code(self, code: str, content: Optional[Dict[str, Any]] = None,
                                    widget: Optional[str]=None) -> bool:
         """
@@ -109,6 +114,8 @@ class AuthenticationController:
             return True
         st.session_state[f'2FA_check_{widget}'] = False
         return False
+
+    # Forgot password
     def forgot_password(self, username: str, callback: Optional[Callable] = None,
                         captcha: bool = False, entered_captcha: Optional[str] = None
                         ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -140,6 +147,8 @@ class AuthenticationController:
         if not self.validator.validate_length(username, 1):
             raise ForgotError('Username not provided')
         return self.authentication_model.forgot_password(username, callback)
+
+    # Forgot username
     def forgot_username(self, email: str, callback: Optional[Callable] = None,
                         captcha: bool = False, entered_captcha: Optional[str] = None
                         ) -> Tuple[Optional[str], Optional[str]]:
@@ -171,6 +180,8 @@ class AuthenticationController:
         if not self.validator.validate_length(email, 1):
             raise ForgotError('Email not provided')
         return self.authentication_model.forgot_username(email, callback)
+
+    # Generate two factor authentication code
     def generate_two_factor_auth_code(self, email: str, widget: Optional[str] = None) -> str:
         """
         Handles requests to generate a two factor authentication code.
@@ -183,6 +194,8 @@ class AuthenticationController:
             Widget name to append to session state variable name.
         """
         self.authentication_model.generate_two_factor_auth_code(email, widget)
+
+    # Guest login
     def guest_login(self, cookie_controller: Any, provider: str = 'google',
                     oauth2: Optional[Dict[str, Any]] = None,
                     max_concurrent_users: Optional[int] = None,
@@ -220,6 +233,8 @@ class AuthenticationController:
                                                      max_concurrent_users=max_concurrent_users,
                                                      single_session=single_session,
                                                      callback=callback)
+
+    # Login
     def login(self, username: Optional[str] = None, password: Optional[str] = None,
               max_concurrent_users: Optional[int] = None, max_login_attempts: Optional[int] = None,
               token: Optional[Dict[str, str]] = None, single_session: bool = False,
@@ -265,6 +280,8 @@ class AuthenticationController:
         return self.authentication_model.login(username, password, max_concurrent_users,
                                                max_login_attempts, token, single_session,
                                                callback)
+
+    # Logout
     def logout(self, callback: Optional[Callable]=None) -> None:
         """
         Logs out the user by clearing session state variables.
@@ -275,6 +292,8 @@ class AuthenticationController:
             Function to be executed upon logout.
         """
         self.authentication_model.logout(callback)
+
+    # Register user
     def register_user(self, new_first_name: str, new_last_name: str, new_email: str,
                       new_username: str, new_password: str, new_password_repeat: str,
                       password_hint: str, pre_authorized: Optional[List[str]] = None,
@@ -356,6 +375,8 @@ class AuthenticationController:
         return self.authentication_model.register_user(new_first_name, new_last_name, new_email,
                                                        new_username, new_password, password_hint,
                                                        pre_authorized, roles, callback)
+
+    # Reset password
     def reset_password(self, username: str, password: str, new_password: str,
                        new_password_repeat: str, callback: Optional[Callable] = None) -> bool:
         """
@@ -391,6 +412,8 @@ class AuthenticationController:
             raise ResetError(self.validator.diagnose_password(new_password))
         return self.authentication_model.reset_password(username, password, new_password,
                                                         callback)
+
+    # Send password
     def send_password(self, result: Tuple[Optional[str], Optional[str], Optional[str]]) -> bool:
         """
         Sends a newly generated password to the user via email.
@@ -406,6 +429,8 @@ class AuthenticationController:
             True if password email was sent successfully, False otherwise.
         """
         return self.authentication_model.send_email('PWD', result[1], result[2])
+
+    # Send username
     def send_username(self, result: Tuple[Optional[str], Optional[str]]) -> bool:
         """
         Sends the retrieved username to the user via email.
@@ -421,6 +446,8 @@ class AuthenticationController:
             True if username email was sent successfully, False otherwise.
         """
         return self.authentication_model.send_email('USERNAME', result[1], result[0])
+
+    # Update user details
     def update_user_details(self, username: str, field: str, new_value: str,
                             callback: Optional[Callable] = None) -> bool:
         """

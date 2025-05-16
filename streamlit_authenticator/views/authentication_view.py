@@ -15,6 +15,7 @@ import time
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 import streamlit as st
+from streamlit_extras.stylable_container import stylable_container
 
 from ..controllers import AuthenticationController, CookieController
 from .. import params
@@ -86,12 +87,16 @@ class Authenticate:
                                                                      self.secret_key,
                                                                      self.attrs.get('server_url'))
         self.encryptor = Encryptor(self.secret_key)
-    def forgot_password(self, location: Literal['main', 'sidebar'] = 'main',
-                        fields: Optional[Dict[str, str]] = None, captcha: bool = False,
-                        send_email: bool = False, two_factor_auth: bool = False,
-                        clear_on_submit: bool = False, key: str = 'Forgot password',
-                        callback: Optional[Callable] = None
-                        ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+
+    # Forgot password
+    def forgot_password(
+        self, location: Literal['main', 'sidebar'] = 'main',
+        fields: Optional[Dict[str, str]] = None, captcha: bool = False,
+        send_email: bool = False, two_factor_auth: bool = False,
+        clear_on_submit: bool = False, key: str = 'Forgot password',
+        callback: Optional[Callable] = None, container_css: Optional[str] = None,
+        use_cols: bool = True
+    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Renders a forgot password widget.
 
@@ -113,6 +118,10 @@ class Authenticate:
             Unique key for the widget to prevent duplicate WidgetID errors.
         callback : Callable, optional
             Function to be executed after form submission.
+        container_css : str, optional
+            CSS styles to be applied to the container.
+        use_cols : bool, default=True
+            If True, uses columns for buttons.
 
         Returns
         -------
@@ -127,23 +136,56 @@ class Authenticate:
                       'Error':'Code is incorrect'}
         if location not in ['main', 'sidebar']:
             raise ValueError("Location must be one of 'main' or 'sidebar'")
-        if location == 'main':
-            forgot_password_form = st.form(key=key, clear_on_submit=clear_on_submit)
-        elif location == 'sidebar':
-            forgot_password_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
-        forgot_password_form.subheader(fields.get('Form name', 'Forgot password'))
-        username = forgot_password_form.text_input(fields.get('Username', 'Username'),
-                                                   autocomplete='off')
+        if not container_css:
+            container_css = """
+                {
+                    border-radius: 1rem;
+                    border: 2px solid #49485611;
+                    box-shadow: 1px 1px 3px #49485621;
+                    padding: 1em 1.5em;
+                }
+            """
+        with stylable_container(
+            key="forgot_password_container",
+            css_styles=container_css,
+        ):
+            if location == 'main':
+                forgot_password_form = st.form(
+                    key=key, clear_on_submit=clear_on_submit, border=False
+                )
+            else:
+                forgot_password_form = st.sidebar.form(
+                    key=key, clear_on_submit=clear_on_submit, border=False
+                )
+        forgot_password_form.markdown(
+            f"<h4 style='text-align: center;'>{fields.get('Form name', 'Forgot password')}</h4>",
+            unsafe_allow_html=True
+        )
+        username = forgot_password_form.text_input(
+            fields.get('Username', 'Username'), autocomplete='off'
+        )
         entered_captcha = None
         if captcha:
-            entered_captcha = forgot_password_form.text_input(fields.get('Captcha', 'Captcha'),
-                                                              autocomplete='off')
-            forgot_password_form.image(Helpers.generate_captcha('forgot_password_captcha',
-                                                                self.secret_key))
+            entered_captcha = forgot_password_form.text_input(
+                fields.get('Captcha', 'Captcha'), autocomplete='off'
+            )
+            forgot_password_form.image(
+                Helpers.generate_captcha('forgot_password_captcha', self.secret_key)
+            )
         result = (None, None, None)
-        if forgot_password_form.form_submit_button(fields.get('Submit', 'Submit')):
-            result = self.authentication_controller.forgot_password(username, callback, captcha,
-                                                                    entered_captcha)
+        if use_cols:
+            cols = forgot_password_form.columns([1, 1.5, 1], gap="medium")[1]
+        else:
+            cols = forgot_password_form
+        submit = cols.form_submit_button(
+            fields.get('Submit', 'Request a new password'),
+            use_container_width=True, icon=":material/send:", type="primary"
+        )
+        forgot_password_form.write("")
+        if submit:
+            result = self.authentication_controller.forgot_password(
+                username, callback, captcha, entered_captcha
+            )
             if not two_factor_auth:
                 if send_email:
                     self.authentication_controller.send_password(result)
@@ -157,11 +199,16 @@ class Authenticate:
             del st.session_state['2FA_check_forgot_password']
             return result
         return None, None, None
-    def forgot_username(self, location: Literal['main', 'sidebar'] = 'main',
-                        fields: Optional[Dict[str, str]] = None, captcha: bool = False,
-                        send_email: bool = False, two_factor_auth: bool = False,
-                        clear_on_submit: bool = False, key: str = 'Forgot username',
-                        callback: Optional[Callable]=None) -> Tuple[Optional[str], Optional[str]]:
+
+    # Forgot username
+    def forgot_username(
+        self, location: Literal['main', 'sidebar'] = 'main',
+        fields: Optional[Dict[str, str]] = None, captcha: bool = False,
+        send_email: bool = False, two_factor_auth: bool = False,
+        clear_on_submit: bool = False, key: str = 'Forgot username',
+        callback: Optional[Callable]=None, container_css: Optional[str] = None,
+        use_cols: bool = True
+    ) -> Tuple[Optional[str], Optional[str]]:
         """
         Renders a forgot username widget.
 
@@ -183,6 +230,10 @@ class Authenticate:
             Unique key for the widget to prevent duplicate WidgetID errors.
         callback : Callable, optional
             Function to be executed after form submission.
+        container_css : str, optional
+            CSS styles to be applied to the container.
+        use_cols : bool, default=True
+            If True, uses columns for buttons.
 
         Returns
         -------
@@ -196,25 +247,56 @@ class Authenticate:
                       'Error':'Code is incorrect'}
         if location not in ['main', 'sidebar']:
             raise ValueError("Location must be one of 'main' or 'sidebar'")
-        if location == 'main':
-            forgot_username_form = st.form(key=key, clear_on_submit=clear_on_submit)
-        elif location == 'sidebar':
-            forgot_username_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
-        forgot_username_form.subheader('Forgot username' if 'Form name' not in fields
-                                       else fields['Form name'])
-        email = forgot_username_form.text_input('Email' if 'Email' not in fields
-                                                else fields['Email'], autocomplete='off')
+        if not container_css:
+            # using background image centered
+            container_css = """
+                {
+                    border-radius: 1rem;
+                    border: 2px solid #49485611;
+                    box-shadow: 1px 1px 3px #49485621;
+                    padding: 1em 1.5em;
+                }
+            """
+        with stylable_container(
+            key="forgot_user_container",
+            css_styles=container_css,
+        ):
+            if location == 'main':
+                forgot_username_form = st.form(
+                    key=key, clear_on_submit=clear_on_submit, border=False
+                )
+            else:
+                forgot_username_form = st.sidebar.form(
+                    key=key, clear_on_submit=clear_on_submit, border=False
+                )
+        forgot_username_form.markdown(
+            f"<h4 style='text-align: center;'>{fields.get('Form name', 'Forgot username')}</h4>",
+            unsafe_allow_html=True
+        )
+        email = forgot_username_form.text_input(
+            fields.get("Email", "Email"), autocomplete='off'
+        )
         entered_captcha = None
         if captcha:
-            entered_captcha = forgot_username_form.text_input('Captcha' if 'Captcha' not in fields
-                                                              else fields['Captcha'],
-                                                              autocomplete='off')
-            forgot_username_form.image(Helpers.generate_captcha('forgot_username_captcha',
-                                                                self.secret_key))
-        if forgot_username_form.form_submit_button('Submit' if 'Submit' not in fields
-                                                   else fields['Submit']):
-            result = self.authentication_controller.forgot_username(email, callback,
-                                                                    captcha, entered_captcha)
+            entered_captcha = forgot_username_form.text_input(
+                fields.get("Captcha", "Captcha"), autocomplete='off'
+            )
+            forgot_username_form.image(
+                Helpers.generate_captcha('forgot_username_captcha', self.secret_key)
+            )
+        if use_cols:
+            cols = forgot_username_form.columns([1, 1.5, 1], gap="medium")[1]
+        else:
+            cols = forgot_username_form
+        submit = cols.form_submit_button(
+            fields.get('Submit', 'Request username'),
+            use_container_width=True, icon=":material/send:", type="primary"
+        )
+        forgot_username_form.write("")
+        if submit:
+            result = self.authentication_controller.forgot_username(
+                email, callback, captcha, entered_captcha
+            )
             if not two_factor_auth:
                 if send_email:
                     self.authentication_controller.send_username(result)
@@ -228,6 +310,8 @@ class Authenticate:
             del st.session_state['2FA_check_forgot_username']
             return result
         return None, email
+
+    # Guest login
     def experimental_guest_login(self, button_name: str='Guest login',
                                  location: Literal['main', 'sidebar'] = 'main',
                                  provider: Literal['google', 'microsoft'] = 'google',
@@ -286,12 +370,16 @@ class Authenticate:
                 if location == 'sidebar' and auth_endpoint:
                     st.sidebar.link_button(button_name, url=auth_endpoint,
                                            use_container_width=use_container_width)
-    def login(self, location: Literal['main', 'sidebar', 'unrendered'] = 'main',
-              max_concurrent_users: Optional[int] = None, max_login_attempts: Optional[int] = None,
-              fields: Optional[Dict[str, str]] = None, captcha: bool = False,
-              single_session: bool=False, clear_on_submit: bool = False, key: str = 'Login',
-              callback: Optional[Callable] = None
-              ) -> Optional[Tuple[Optional[str], Optional[bool], Optional[str]]]:
+
+    # Login
+    def login(
+        self, location: Literal['main', 'sidebar', 'unrendered'] = 'main',
+        max_concurrent_users: Optional[int] = None, max_login_attempts: Optional[int] = None,
+        fields: Optional[Dict[str, str]] = None, captcha: bool = False,
+        single_session: bool=False, clear_on_submit: bool = False, key: str = 'Login',
+        callback: Optional[Callable] = None, container_css: Optional[str] = None,
+        use_cols: bool = True
+    ) -> Optional[Tuple[Optional[str], Optional[bool], Optional[str]]]:
         """
         Renders a login widget.
 
@@ -315,6 +403,8 @@ class Authenticate:
             Unique key for the widget to prevent duplicate WidgetID errors.
         callback : Callable, optional
             Function to execute when the form is submitted.
+        use_cols : bool, default=True
+            If True, uses columns for buttons.
 
         Returns
         -------
@@ -325,6 +415,16 @@ class Authenticate:
         if fields is None:
             fields = {'Form name':'Login', 'Username':'Username', 'Password':'Password',
                       'Login':'Login', 'Captcha':'Captcha'}
+        if not container_css:
+            # using background image centered
+            container_css = """
+                {
+                    border-radius: 1rem;
+                    border: 2px solid #49485611;
+                    box-shadow: 1px 1px 3px #49485621;
+                    padding: 1em 1.5em;
+                }
+            """
         if location not in ['main', 'sidebar', 'unrendered']:
             raise ValueError("Location must be one of 'main' or 'sidebar' or 'unrendered'")
         if not st.session_state.get('authentication_status'):
@@ -333,46 +433,73 @@ class Authenticate:
                 self.authentication_controller.login(token=token)
             time.sleep(self.attrs.get('login_sleep_time', params.PRE_LOGIN_SLEEP_TIME))
             if not st.session_state.get('authentication_status'):
-                if location == 'main':
-                    login_form = st.form(key=key, clear_on_submit=clear_on_submit)
-                elif location == 'sidebar':
-                    login_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
-                elif location == 'unrendered':
-                    return (st.session_state['name'], st.session_state['authentication_status'],
-                            st.session_state['username'])
-                login_form.subheader('Login' if 'Form name' not in fields else fields['Form name'])
-                username = login_form.text_input('Username' if 'Username' not in fields
-                                                 else fields['Username'], autocomplete='off')
+                with stylable_container(
+                    key="login_container",
+                    css_styles=container_css,
+                ):
+                    if location == 'main':
+                        login_form = st.form(key=key, clear_on_submit=clear_on_submit, border=False)
+                    elif location == 'sidebar':
+                        login_form = st.sidebar.form(
+                            key=key, clear_on_submit=clear_on_submit, border=False
+                        )
+                    else:
+                        return (
+                            st.session_state['name'], st.session_state['authentication_status'],
+                            st.session_state['username']
+                        )
+                login_form.markdown(
+                    f"<h4 style='text-align: center;'>{fields.get('Form name', 'Login')}</h4>",
+                    unsafe_allow_html=True
+                )
+                username = login_form.text_input(
+                    fields.get("Username", "Username"), autocomplete='off'
+                )
                 if 'password_hint' in st.session_state:
-                    password = login_form.text_input('Password' if 'Password' not in fields
-                                                     else fields['Password'], type='password',
-                                                     help=st.session_state['password_hint'],
-                                                     autocomplete='off')
+                    password = login_form.text_input(
+                        fields.get('Password', "Password"), type='password',
+                        help=st.session_state['password_hint'],
+                        autocomplete='off'
+                    )
                 else:
-                    password = login_form.text_input('Password' if 'Password' not in fields
-                                                     else fields['Password'], type='password',
-                                                     autocomplete='off')
+                    password = login_form.text_input(
+                        fields.get("Password", "Password"), type='password', autocomplete='off'
+                    )
                 entered_captcha = None
                 if captcha:
-                    entered_captcha = login_form.text_input('Captcha' if 'Captcha' not in fields
-                                                            else fields['Captcha'],
-                                                            autocomplete='off')
-                    login_form.image(Helpers.generate_captcha('login_captcha', self.secret_key))
-                if login_form.form_submit_button('Login' if 'Login' not in fields
-                                                 else fields['Login']):
-                    if self.authentication_controller.login(username, password,
-                                                            max_concurrent_users,
-                                                            max_login_attempts,
-                                                            single_session=single_session,
-                                                            callback=callback, captcha=captcha,
-                                                            entered_captcha=entered_captcha):
+                    entered_captcha = login_form.text_input(
+                        fields.get('Captcha', 'Captcha'), autocomplete='off'
+                    )
+                    login_form.image(
+                        Helpers.generate_captcha('login_captcha', self.secret_key)
+                    )
+                if use_cols:
+                    cols = login_form.columns([1, 1.5, 1], gap="medium")[1]
+                else:
+                    cols = login_form
+                submit = cols.form_submit_button(
+                    fields.get('Login', 'Login'),
+                    use_container_width=True, icon=":material/login:", type="primary"
+                )
+                login_form.write("")
+                if submit:
+                    if self.authentication_controller.login(
+                        username, password, max_concurrent_users,
+                        max_login_attempts, single_session=single_session,
+                        callback=callback, captcha=captcha,
+                        entered_captcha=entered_captcha
+                    ):
                         self.cookie_controller.set_cookie()
                         if self.path and self.cookie_controller.get_cookie():
                             st.rerun()
-    def logout(self, button_name: str = 'Logout',
-               location: Literal['main', 'sidebar', 'unrendered'] = 'main',
-               key: str = 'Logout', use_container_width: bool = False,
-               callback: Optional[Callable] = None) -> None:
+
+    # Logout
+    def logout(
+        self, button_name: str = 'Logout',
+        location: Literal['main', 'sidebar', 'unrendered'] = 'main',
+        key: str = 'Logout', use_container_width: bool = False,
+        callback: Optional[Callable] = None
+    ) -> None:
         """
         Renders a logout button.
 
@@ -394,25 +521,35 @@ class Authenticate:
         if location not in ['main', 'sidebar', 'unrendered']:
             raise ValueError("Location must be one of 'main' or 'sidebar' or 'unrendered'")
         if location == 'main':
-            if st.button(button_name, key=key, use_container_width=use_container_width):
+            if st.button(
+                button_name, key=key, use_container_width=use_container_width,
+                icon=":material/logout:", type="primary"
+            ):
                 self.authentication_controller.logout(callback)
                 self.cookie_controller.delete_cookie()
         elif location == 'sidebar':
-            if st.sidebar.button(button_name, key=key, use_container_width=use_container_width):
+            if st.sidebar.button(
+                button_name, key=key, use_container_width=use_container_width,
+                icon=":material/logout:", type="primary"
+            ):
                 self.authentication_controller.logout(callback)
                 self.cookie_controller.delete_cookie()
         elif location == 'unrendered':
             if st.session_state.get('authentication_status'):
                 self.authentication_controller.logout()
                 self.cookie_controller.delete_cookie()
-    def register_user(self, location: Literal['main', 'sidebar'] = 'main',
-                      pre_authorized: Optional[List[str]] = None,
-                      domains: Optional[List[str]] = None, fields: Optional[Dict[str, str]] = None,
-                      captcha: bool = True, roles: Optional[List[str]] = None,
-                      merge_username_email: bool = False, password_hint: bool = True,
-                      two_factor_auth: bool = False, clear_on_submit: bool = False,
-                      key: str = 'Register user', callback: Optional[Callable] = None
-                      ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+
+    # Register user
+    def register_user(
+        self, location: Literal['main', 'sidebar'] = 'main',
+        pre_authorized: Optional[List[str]] = None,
+        domains: Optional[List[str]] = None, fields: Optional[Dict[str, str]] = None,
+        captcha: bool = True, roles: Optional[List[str]] = None,
+        merge_username_email: bool = False, password_hint: bool = True,
+        two_factor_auth: bool = False, clear_on_submit: bool = False,
+        key: str = 'Register user', callback: Optional[Callable] = None,
+        container_css: Optional[str] = None, use_cols: bool = True,
+    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """
         Renders a register new user widget.
 
@@ -442,6 +579,10 @@ class Authenticate:
             Unique key for the widget to prevent duplicate WidgetID errors.
         callback : Callable, optional
             Function to execute when the form is submitted.
+        container_css : str, optional
+            CSS styles to be applied to the container.
+        use_cols : bool, default=True
+            If True, uses columns for buttons.
 
         Returns
         -------
@@ -461,73 +602,117 @@ class Authenticate:
                       'Password hint':'Password hint', 'Captcha':'Captcha', 'Register':'Register',
                       'Dialog name':'Verification code', 'Code':'Code', 'Submit':'Submit',
                       'Error':'Code is incorrect'}
+        if not container_css:
+            container_css = """
+                {
+                    border-radius: 1rem;
+                    border: 2px solid #49485611;
+                    box-shadow: 1px 1px 3px #49485621;
+                    padding: 1em 1.5em;
+                }
+            """
         if location not in ['main', 'sidebar']:
             raise ValueError("Location must be one of 'main' or 'sidebar'")
-        if location == 'main':
-            register_user_form = st.form(key=key, clear_on_submit=clear_on_submit)
-        elif location == 'sidebar':
-            register_user_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
-        register_user_form.subheader('Register user' if 'Form name' not in fields
-                                     else fields['Form name'])
+        with stylable_container(
+            key="register_user_container",
+            css_styles=container_css,
+        ):
+            if location == 'main':
+                register_user_form = st.form(key=key, clear_on_submit=clear_on_submit, border=False)
+            else:
+                register_user_form = st.sidebar.form(
+                    key=key, clear_on_submit=clear_on_submit, border=False
+                )
+        register_user_form.markdown(
+            f"<h4 style='text-align: center;'>{fields.get('Form name', 'Register user')}</h4>",
+            unsafe_allow_html=True
+        )
         col1_1, col2_1 = register_user_form.columns(2)
-        new_first_name = col1_1.text_input('First name' if 'First name' not in fields
-                                         else fields['First name'], autocomplete='off')
-        new_last_name = col2_1.text_input('Last name' if 'Last name' not in fields
-                                        else fields['Last name'], autocomplete='off')
+        new_first_name = col1_1.text_input(
+            fields.get("First name", "First name"), autocomplete='off'
+        )
+        new_last_name = col2_1.text_input(
+            fields.get("Last name", "Last name"), autocomplete='off'
+        )
         if merge_username_email:
-            new_email = register_user_form.text_input('Email' if 'Email' not in fields
-                                        else fields['Email'], autocomplete='off')
+            new_email = register_user_form.text_input(
+                fields.get("Email", "Email"), autocomplete='off'
+            )
             new_username = new_email
         else:
-            new_email = col1_1.text_input('Email' if 'Email' not in fields
-                                        else fields['Email'], autocomplete='off')
-            new_username = col2_1.text_input('Username' if 'Username' not in fields
-                                        else fields['Username'], autocomplete='off')
+            new_email = col1_1.text_input(
+                fields.get("Email", "Email"), autocomplete='off'
+            )
+            new_username = col2_1.text_input(
+                fields.get("Username", "Username"), autocomplete='off'
+            )
         col1_2, col2_2 = register_user_form.columns(2)
-        password_instructions = self.attrs.get('password_instructions',
-                                               params.PASSWORD_INSTRUCTIONS)
-        new_password = col1_2.text_input('Password' if 'Password' not in fields
-                                       else fields['Password'], type='password',
-                                       help=password_instructions, autocomplete='off')
-        new_password_repeat = col2_2.text_input('Repeat password' if 'Repeat password' not in fields
-                                              else fields['Repeat password'], type='password',
-                                              autocomplete='off')
+        password_instructions = self.attrs.get(
+            'password_instructions', params.PASSWORD_INSTRUCTIONS
+        )
+        new_password = col1_2.text_input(
+            fields.get("Password", "Password"), type='password',
+            help=password_instructions, autocomplete='off'
+        )
+        new_password_repeat = col2_2.text_input(
+            fields.get("Repeat password", "Repeat password"), type='password', autocomplete='off'
+        )
         if password_hint:
-            password_hint = register_user_form.text_input('Password hint' if 'Password hint' not in
-                                                        fields else fields['Password hint'],
-                                                        autocomplete='off')
+            password_hint = register_user_form.text_input(
+                fields.get("Password hint", "Password hint"), autocomplete='off'
+            )
+        user_roles = register_user_form.multiselect(
+            fields.get("Roles", "Roles"), options=roles,
+        )
         entered_captcha = None
         if captcha:
-            entered_captcha = register_user_form.text_input('Captcha' if 'Captcha' not in fields
-                                                            else fields['Captcha'],
-                                                            autocomplete='off').strip()
-            register_user_form.image(Helpers.generate_captcha('register_user_captcha',
-                                                              self.secret_key))
-        if register_user_form.form_submit_button('Register' if 'Register' not in fields
-                                                 else fields['Register']):
+            entered_captcha = register_user_form.text_input(
+                fields.get("Captcha", "Captcha"), autocomplete='off'
+            ).strip()
+            register_user_form.image(
+                Helpers.generate_captcha('register_user_captcha', self.secret_key)
+            )
+        if use_cols:
+            cols = register_user_form.columns([1, 1.5, 1], gap="medium")[1]
+        else:
+            cols = register_user_form
+        submit = cols.form_submit_button(
+            fields.get('Register', 'Register'),
+            use_container_width=True, icon=":material/send:", type="primary"
+        )
+        register_user_form.write("")
+        if submit:
             if two_factor_auth:
                 self.__two_factor_auth(new_email, widget='register', fields=fields)
             else:
-                return self.authentication_controller.register_user(new_first_name, new_last_name,
-                                                                    new_email, new_username,
-                                                                    new_password,
-                                                                    new_password_repeat,
-                                                                    password_hint, pre_authorized,
-                                                                    domains, roles, callback,
-                                                                    captcha, entered_captcha)
+                return self.authentication_controller.register_user(
+                    new_first_name, new_last_name,
+                    new_email, new_username,
+                    new_password,
+                    new_password_repeat,
+                    password_hint, pre_authorized,
+                    domains, user_roles, callback,
+                    captcha, entered_captcha
+                )
         if two_factor_auth and st.session_state.get('2FA_check_register'):
             del st.session_state['2FA_check_register']
-            return self.authentication_controller.register_user(new_first_name, new_last_name,
-                                                                new_email, new_username,
-                                                                new_password, new_password_repeat,
-                                                                password_hint, pre_authorized,
-                                                                domains, roles, callback, captcha,
-                                                                entered_captcha)
+            return self.authentication_controller.register_user(
+                new_first_name, new_last_name,
+                new_email, new_username,
+                new_password, new_password_repeat,
+                password_hint, pre_authorized,
+                domains, user_roles, callback, captcha,
+                entered_captcha
+            )
         return None, None, None
-    def reset_password(self, username: str, location: Literal['main', 'sidebar'] = 'main',
-                       fields: Optional[Dict[str, str]] = None, clear_on_submit: bool = False,
-                       key: str = 'Reset password', callback: Optional[Callable] = None
-                       ) -> Optional[bool]:
+
+    # Reset password
+    def reset_password(
+        self, username: str, location: Literal['main', 'sidebar'] = 'main',
+        fields: Optional[Dict[str, str]] = None, clear_on_submit: bool = False,
+        key: str = 'Reset password', callback: Optional[Callable] = None,
+        container_css: Optional[str] = None, use_cols: bool = True
+    ) -> Optional[bool]:
         """
         Renders a password reset widget.
 
@@ -545,6 +730,10 @@ class Authenticate:
             Unique key for the widget to prevent duplicate WidgetID errors.
         callback : Callable, optional
             Function to execute when the form is submitted.
+        container_css : str, optional
+            CSS styles to be applied to the container.
+        use_cols : bool, default=True
+            If True, uses columns for buttons.
 
         Returns
         -------
@@ -560,38 +749,67 @@ class Authenticate:
                       'Reset':'Reset'}
         if location not in ['main', 'sidebar']:
             raise ValueError("Location must be one of 'main' or 'sidebar'")
-        if location == 'main':
-            reset_password_form = st.form(key=key, clear_on_submit=clear_on_submit)
-        elif location == 'sidebar':
-            reset_password_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
-        reset_password_form.subheader('Reset password' if 'Form name' not in fields
-                                      else fields['Form name'])
-        password = reset_password_form.text_input('Current password'
-                                                  if 'Current password' not in fields
-                                                  else fields['Current password'],
-                                                  type='password', autocomplete='off').strip()
-        password_instructions = self.attrs.get('password_instructions',
-                                               params.PASSWORD_INSTRUCTIONS)
-        new_password = reset_password_form.text_input('New password'
-                                                      if 'New password' not in fields
-                                                      else fields['New password'],
-                                                      type='password',
-                                                      help=password_instructions,
-                                                      autocomplete='off').strip()
-        new_password_repeat = reset_password_form.text_input('Repeat password'
-                                                             if 'Repeat password' not in fields
-                                                             else fields['Repeat password'],
-                                                             type='password',
-                                                             autocomplete='off').strip()
-        if reset_password_form.form_submit_button('Reset' if 'Reset' not in fields
-                                                  else fields['Reset']):
-            if self.authentication_controller.reset_password(username, password, new_password,
-                                                          new_password_repeat, callback):
+        if not container_css:
+            container_css = """
+                {
+                    border-radius: 1rem;
+                    border: 2px solid #49485611;
+                    box-shadow: 1px 1px 3px #49485621;
+                    padding: 1em 1.5em;
+                }
+            """
+        with stylable_container(
+            key="reset_password_container",
+            css_styles=container_css,
+        ):
+            if location == 'main':
+                reset_password_form = st.form(key=key, clear_on_submit=clear_on_submit, border=False)
+            else:
+                reset_password_form = st.sidebar.form(
+                    key=key, clear_on_submit=clear_on_submit, border=False
+                )
+        reset_password_form.markdown(
+            f"<h4 style='text-align: center;'>{fields.get('Form name', 'Reset password')}</h4>",
+            unsafe_allow_html=True
+        )
+        password = reset_password_form.text_input(
+            fields.get('Current password', 'Current password'), type='password', autocomplete='off'
+        ).strip()
+        password_instructions = self.attrs.get(
+            'password_instructions', params.PASSWORD_INSTRUCTIONS
+        )
+        new_password = reset_password_form.text_input(
+            fields.get('New password', 'New password'),
+            type='password',
+            help=password_instructions,
+            autocomplete='off'
+        ).strip()
+        new_password_repeat = reset_password_form.text_input(
+            fields.get('Repeat password', 'Repeat password'),
+            type='password',
+            autocomplete='off'
+        ).strip()
+        if use_cols:
+            cols = reset_password_form.columns([1, 1.5, 1], gap="medium")[1]
+        else:
+            cols = reset_password_form
+        submit = cols.form_submit_button(
+            fields.get('Reset', 'Reset'),
+            use_container_width=True, icon=":material/send:", type="primary"
+        )
+        reset_password_form.write("")
+        if submit:
+            if self.authentication_controller.reset_password(
+                username, password, new_password, new_password_repeat, callback
+            ):
                 return True
         return None
-    def __two_factor_auth(self, email: str, content: Optional[Dict[str, Any]] = None,
-                          fields: Optional[Dict[str, str]] = None, widget: Optional[str] = None
-                          ) -> None:
+
+    # Two-factor authentication
+    def __two_factor_auth(
+        self, email: str, content: Optional[Dict[str, Any]] = None,
+        fields: Optional[Dict[str, str]] = None, widget: Optional[str] = None
+    ) -> None:
         """
         Renders a two-factor authentication widget.
 
@@ -607,22 +825,30 @@ class Authenticate:
             Widget name used as a key in session state variables.
         """
         self.authentication_controller.generate_two_factor_auth_code(email, widget)
-        @st.dialog('Verification code' if 'Dialog name' not in fields else fields['Dialog name'])
+        @st.dialog(fields.get('Dialog name', 'Verification code'))
         def two_factor_auth_form():
-            code = st.text_input('Code' if 'Code' not in fields else fields['Code'],
+            code = st.text_input(fields.get('Code', 'Code'),
                                  help='Please enter the code sent to your email'
                                  if 'Instructions' not in fields else fields['Instructions'],
                                  autocomplete='off')
-            if st.button('Submit' if 'Submit' not in fields else fields['Submit']):
+            if st.button(
+                fields.get('Submit', 'Submit'),
+                use_container_width=True, icon=":material/send:", type="primary"
+            ):
                 if self.authentication_controller.check_two_factor_auth_code(code, content, widget):
                     st.rerun()
                 else:
-                    st.error('Code is incorrect' if 'Error' not in fields else fields['Error'])
+                    st.error(fields.get('Error', 'Code is incorrect'), icon=":material/close:")
         two_factor_auth_form()
-    def update_user_details(self, username: str, location: Literal['main', 'sidebar'] = 'main',
-                            fields: Optional[Dict[str, str]] = None,
-                            clear_on_submit: bool = False, key: str = 'Update user details',
-                            callback: Optional[Callable] = None) -> bool:
+
+    # Update user details
+    def update_user_details(
+        self, username: str, location: Literal['main', 'sidebar'] = 'main',
+        fields: Optional[Dict[str, str]] = None, roles: Optional[List[str]] = None,
+        clear_on_submit: bool = False, key: str = 'Update user details',
+        callback: Optional[Callable] = None, container_css: Optional[str] = None,
+        use_cols: bool = True
+    ) -> bool:
         """
         Renders an update user details widget.
 
@@ -640,6 +866,10 @@ class Authenticate:
             Unique key for the widget to prevent duplicate WidgetID errors.
         callback : Callable, optional
             Function to execute when the form is submitted.
+        container_css : str, optional
+            CSS styles to be applied to the container.
+        use_cols : bool, default=True
+            If True, uses columns for buttons.
 
         Returns
         -------
@@ -652,35 +882,75 @@ class Authenticate:
         if fields is None:
             fields = {'Form name':'Update user details', 'Field':'Field', 'First name':'First name',
                       'Last name':'Last name', 'Email':'Email', 'New value':'New value',
-                      'Update':'Update'}
+                      'Update':'Update', 'Roles':'Roles'}
         if location not in ['main', 'sidebar']:
             raise ValueError("Location must be one of 'main' or 'sidebar'")
-        if location == 'main':
-            update_user_details_form = st.form(key=key, clear_on_submit=clear_on_submit)
-        elif location == 'sidebar':
-            update_user_details_form = st.sidebar.form(key=key, clear_on_submit=clear_on_submit)
-        update_user_details_form.subheader('Update user details' if 'Form name' not in fields
-                                           else fields['Form name'])
-        update_user_details_form_fields = ['First name' if 'First name' not in fields else \
-                                           fields['First name'],
-                                           'Last name' if 'Last name' not in fields else \
-                                            fields['Last name'],
-                                           'Email' if 'Email' not in fields else fields['Email']]
-        field = update_user_details_form.selectbox('Field' if 'Field' not in fields
-                                                   else fields['Field'],
-                                                   update_user_details_form_fields)
-        new_value = update_user_details_form.text_input('New value' if 'New value' not in fields
-                                                        else fields['New value'],
-                                                        autocomplete='off').strip()
+        if not container_css:
+            container_css = """
+                {
+                    border-radius: 1rem;
+                    border: 2px solid #49485611;
+                    box-shadow: 1px 1px 3px #49485621;
+                    padding: 1em 1.5em;
+                }
+            """
+        update_user_details_form = stylable_container(
+            key="update_user_container",
+            css_styles=container_css,
+        )
+        # with stylable_container(
+        #     key="update_user_container",
+        #     css_styles=container_css,
+        # ):
+        #     if location == 'main':
+        #         update_user_details_form = st.form(
+        #             key=key, clear_on_submit=clear_on_submit, border=False
+        #         )
+        #     else:
+        #         update_user_details_form = st.sidebar.form(
+        #             key=key, clear_on_submit=clear_on_submit, border=False
+        #         )
+        update_user_details_form.markdown(
+            f"<h4 style='text-align: center;'>{fields.get('Form name', 'Update user details')}</h4>",   # pylint: disable=line-too-long
+            unsafe_allow_html=True
+        )
+        update_user_details_form_fields = [
+            fields.get("First name", "Firstname"),
+            fields.get("Last name", "Lastname"),
+            fields.get("Email", "Email"),
+            fields.get("Roles", "Roles")
+        ]
+        field = update_user_details_form.selectbox(
+            fields.get("Field", "Field"), update_user_details_form_fields
+        )
+        if field == "Roles":
+            new_value = update_user_details_form.multiselect(
+                fields.get("Roles", "Roles"), options=roles,
+            )
+        else:
+            new_value = update_user_details_form.text_input(
+                fields.get("New value", "New value"), autocomplete='off'
+            ).strip()
         if update_user_details_form_fields.index(field) == 0:
             field = 'first_name'
         elif update_user_details_form_fields.index(field) == 1:
             field = 'last_name'
         elif update_user_details_form_fields.index(field) == 2:
             field = 'email'
-        if update_user_details_form.form_submit_button('Update' if 'Update' not in fields
-                                                       else fields['Update']):
-            if self.authentication_controller.update_user_details(username, field, new_value,
-                                                                  callback):
+        else:
+            field = 'roles'
+        if use_cols:
+            cols = update_user_details_form.columns([1, 1.5, 1], gap="medium")[1]
+        else:
+            cols = update_user_details_form
+        submit = cols.button(
+            fields.get('Update', 'Update'),
+            use_container_width=True, icon=":material/send:", type="primary"
+        )
+        update_user_details_form.write("")
+        if submit:
+            if self.authentication_controller.update_user_details(
+                username, field, new_value, callback
+            ):
                 # self.cookie_controller.set_cookie()
                 return True

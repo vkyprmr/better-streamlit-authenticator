@@ -13,6 +13,7 @@ import json
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 import streamlit as st
+from argon2 import PasswordHasher
 
 from ..models.cloud import CloudModel
 from ..models.oauth2 import GoogleModel
@@ -84,6 +85,7 @@ class AuthenticationModel:
                 key.lower(): value
                 for key, value in self.credentials['usernames'].items()
                 }
+            self.hasher = Hasher(PasswordHasher())
             if auto_hash:
                 if len(self.credentials['usernames']) > params.AUTO_HASH_MAX_USERS:
                     print(f"""Auto hashing in progress. To avoid runtime delays, please manually
@@ -93,9 +95,13 @@ class AuthenticationModel:
                           {params.AUTO_HASH_MAX_USERS_LINK}.""")
                 for username, _ in self.credentials['usernames'].items():
                     if 'password' in self.credentials['usernames'][username] and \
-                        not Hasher.is_hash(self.credentials['usernames'][username]['password']):
+                        not self.hasher.is_hash(self.credentials['usernames'][username]['password']):
                         self.credentials['usernames'][username]['password'] = \
-                        Hasher.hash(self.credentials['usernames'][username]['password'])
+                        self.hasher.hash(
+                            self.credentials['usernames'][username]['password']
+                        )
+                        if self.path:
+                            Helpers.update_config_file(self.path, 'credentials', self.credentials)
         else:
             self.credentials['usernames'] = {}
         if 'name' not in st.session_state:
@@ -130,7 +136,9 @@ class AuthenticationModel:
         if username not in self.credentials['usernames']:
             return False
         try:
-            if Hasher.check_pw(password, self.credentials['usernames'][username]['password']):
+            if self.hasher.check_pw(
+                password, self.credentials['usernames'][username]['password']
+            ):
                 return True
             self._record_failed_login_attempts(username)
             return False
@@ -362,6 +370,8 @@ class AuthenticationModel:
             False: non-guest user.
         """
         return 'password' not in self.credentials['usernames'].get(username, {'password': None})
+
+    # Login
     def login(self, username: str, password: str, max_concurrent_users: Optional[int] = None,
               max_login_attempts: Optional[int] = None, token: Optional[Dict[str, str]] = None,
               single_session: bool = False, callback: Optional[Callable] = None) -> bool:
@@ -440,6 +450,8 @@ class AuthenticationModel:
             if self.path:
                 Helpers.update_config_file(self.path, 'credentials', self.credentials)
         return None
+
+    # Logout
     def logout(self, callback: Optional[Callable] = None) -> None:
         """
         Logs out the user by clearing session state variables.
@@ -465,6 +477,8 @@ class AuthenticationModel:
             st.session_state[key] = None
         if self.path:
             Helpers.update_config_file(self.path, 'credentials', self.credentials)
+
+    # Record failed login attempts
     def _record_failed_login_attempts(self, username: str, reset: bool = False) -> None:
         """
         Records the number of failed login attempts for a given username.
@@ -486,6 +500,8 @@ class AuthenticationModel:
             self.credentials['usernames'][username]['failed_login_attempts'] += 1
         if self.path:
             Helpers.update_config_file(self.path, 'credentials', self.credentials)
+
+    # Register credentials
     def _register_credentials(self, username: str, first_name: str, last_name: str,
                               password: str, email: str, password_hint: str,
                               roles: Optional[List[str]] = None) -> None:
@@ -514,7 +530,7 @@ class AuthenticationModel:
             'logged_in': False,
             'first_name': first_name,
             'last_name': last_name,
-            'password': Hasher.hash(password),
+            'password': self.hasher.hash(password),
             'roles': roles
         }
         if password_hint:
@@ -522,6 +538,8 @@ class AuthenticationModel:
         self.credentials['usernames'][username] = user_data
         if self.path:
             Helpers.update_config_file(self.path, 'credentials', self.credentials)
+
+    # Register user
     def register_user(self, new_first_name: str, new_last_name: str, new_email: str,
                       new_username: str, new_password: str, password_hint: str,
                       pre_authorized: Optional[List[str]] = None,
@@ -582,6 +600,8 @@ class AuthenticationModel:
                       'new_last_name': new_last_name, 'new_email': new_email,
                       'new_username': new_username})
         return new_email, new_username, f'{new_first_name} {new_last_name}'
+
+    # Reset password
     def reset_password(self, username: str, password: str, new_password: str,
                        callback: Optional[Callable] = None) -> bool:
         """
@@ -614,6 +634,8 @@ class AuthenticationModel:
             callback({'widget': 'Reset password', 'username': username, 'email': user.get('email'),
                       'name': self._get_user_name(username), 'roles': user.get('roles')})
         return True
+
+    # Send email
     def send_email(self, email_type: Literal['2FA', 'PWD', 'USERNAME'], recipient: str,
                    content: str) -> bool:
         """
@@ -643,6 +665,8 @@ class AuthenticationModel:
         if not self.validator.validate_email(recipient):
             raise CloudError('Email not valid')
         return self.cloud_model.send_email(email_type, recipient, content)
+
+    # Send password
     def send_password(self, result: Optional[Dict[str, Any]] = None) -> bool:
         """
         Sends a newly generated password to the user via email.
@@ -662,6 +686,8 @@ class AuthenticationModel:
             _, email, password = json.loads(decrypted)
             return self.send_email('PWD', email, password)
         return self.send_email('PWD', result[1], result[2])
+
+    # Send username
     def send_username(self, result: Optional[Dict[str, Any]] = None) -> bool:
         """
         Sends the forgotten username to the user's email.
@@ -681,6 +707,8 @@ class AuthenticationModel:
             username, email = json.loads(decrypted)
             return self.send_email('USERNAME', email, username)
         return self.send_email('USERNAME', result[1], result[0])
+
+    # Set random password
     def _set_random_password(self, username: str) -> str:
         """
         Updates the credentials dictionary with the user's hashed random password.
@@ -696,10 +724,12 @@ class AuthenticationModel:
             New plain text password that should be transferred to the user securely.
         """
         random_password = Helpers.generate_random_string()
-        self.credentials['usernames'][username]['password'] = Hasher.hash(random_password)
+        self.credentials['usernames'][username]['password'] = self.hasher.hash(random_password)
         if self.path:
             Helpers.update_config_file(self.path, 'credentials', self.credentials)
         return random_password
+
+    # Update entry
     def _update_entry(self, username: str, key: str, value: str) -> None:
         """
         Updates the credentials dictionary with the user's updated entry.
@@ -716,6 +746,8 @@ class AuthenticationModel:
         self.credentials['usernames'][username][key] = value
         if self.path:
             Helpers.update_config_file(self.path, 'credentials', self.credentials)
+
+    # Update password
     def _update_password(self, username: str, password: str) -> None:
         """
         Updates the credentials dictionary with the user's hashed reset password.
@@ -727,9 +759,11 @@ class AuthenticationModel:
         password : str
             Updated plain text password.
         """
-        self.credentials['usernames'][username]['password'] = Hasher.hash(password)
+        self.credentials['usernames'][username]['password'] = self.hasher.hash(password)
         if self.path:
             Helpers.update_config_file(self.path, 'credentials', self.credentials)
+
+    # Update user details
     def update_user_details(self, username: str, field: str, new_value: str,
                             callback: Optional[Callable] = None) -> bool:
         """

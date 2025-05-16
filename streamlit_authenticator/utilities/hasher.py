@@ -9,18 +9,21 @@ Libraries Imported:
 """
 
 import re
-import bcrypt
 from typing import Dict, List
+
+import bcrypt
+import streamlit as st
+from argon2 import PasswordHasher, exceptions
 
 
 class Hasher:
     """
     This class provides methods for hashing and verifying passwords.
     """
-    def __init__(self) -> None:
-        pass
-    @classmethod
-    def check_pw(cls, password: str, hashed_password: str) -> bool:
+    def __init__(self, hasher: PasswordHasher) -> None:
+        self.hasher = hasher
+
+    def check_pw(self, password: str, hashed_password: str) -> bool:
         """
         Verifies if a plain text password matches a hashed password.
 
@@ -36,9 +39,14 @@ class Hasher:
         bool
             True if the password matches the hash, False otherwise.
         """
-        return bcrypt.checkpw(password.encode(), hashed_password.encode())
-    @classmethod
-    def hash(cls, password: str) -> str:
+        try:
+            return self.hasher.verify(hashed_password, password)
+        except exceptions.VerifyMismatchError:
+            st.error("Incorrect Password", icon=":material/close:")
+            return False
+        # return bcrypt.checkpw(password.encode(), hashed_password.encode())
+
+    def hash(self, password: str) -> str:
         """
         Hashes a plain text password using bcrypt.
 
@@ -52,9 +60,10 @@ class Hasher:
         str
             The securely hashed password.
         """
-        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    @classmethod
-    def hash_list(cls, passwords: List[str]) -> List[str]:
+        return self.hasher.hash(password)
+        # return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+    def hash_list(self, passwords: List[str]) -> List[str]:
         """
         Hashes a list of plain text passwords.
 
@@ -68,9 +77,11 @@ class Hasher:
         list of str
             The list of securely hashed passwords.
         """
-        return [cls.hash(password) for password in passwords]
-    @classmethod
-    def hash_passwords(cls, credentials: Dict[str, Dict[str, str]]) -> Dict[str, Dict[str, str]]:
+        return [self.hasher.hash(password) for password in passwords]
+
+    def hash_passwords(
+        self, credentials: Dict[str, Dict[str, str]],
+    ) -> Dict[str, Dict[str, str]]:
         """
         Hashes all plain text passwords in a credentials dictionary.
 
@@ -88,10 +99,11 @@ class Hasher:
 
         for _, user in usernames.items():
             password = user['password']
-            if not cls.is_hash(password):
-                hashed_password = cls.hash(password)
+            if not self.is_hash(password):
+                hashed_password = self.hash(password)
                 user['password'] = hashed_password
         return credentials
+
     @classmethod
     def is_hash(cls, hash_string: str) -> bool:
         """
@@ -107,5 +119,6 @@ class Hasher:
         bool
             True if the string is a valid bcrypt hash, False otherwise.
         """
-        bcrypt_regex = re.compile(r'^\$2[aby]\$\d+\$.{53}$')
-        return bool(bcrypt_regex.match(hash_string))
+        return hash_string.startswith("$argon2")
+        # bcrypt_regex = re.compile(r'^\$2[aby]\$\d+\$.{53}$')
+        # return bool(bcrypt_regex.match(hash_string))
